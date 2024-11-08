@@ -1,0 +1,30 @@
+Front end
+1.sending files. in html it will be multipart/formdata
+2.in frontend data send in formdata in which file is appended. instead of application/json
+
+Backend.
+1. To handle multipart form data install multer
+2. Before storing it in s3. will handle the file in memory/buffer instead of server filesystem(ie operation like modify , validate ,changing name) then pushing in S3 without saing it in filesystem
+   The memory storage engine stores the files in memory as Buffer objects. It doesn't have any options.
+            const storage = multer.memoryStorage()
+            const upload = multer({ storage: storage })
+    When using memory storage, the file info will contain a field called buffer that contains the entire file.
+    WARNING: Uploading very large files, or relatively small files in large numbers very quickly, can cause your application to run out of memory when memory storage is used.
+    // some other tech. 
+    Presigned URL: Best for reducing server load and handling direct uploads from the client.
+    Multipart Uploads: Ideal for handling very large files efficiently with parallel uploads.
+    Streaming to S3: More memory-efficient if you want to avoid buffering large files in memory before sending to S3.
+3. create a BUCKET in s3 unique name and all setting default
+4. now using console we can add and delete file. but express can do it, so let config it.
+     IAM dashboard(search in aws). in whih we defining policy (here defining only through our express can access this)
+     Polcies->create policy -> s3(fo which we need) -> acion allowed ( read: getObject, write: putObject, deleteObject) .then Resource create arn . Resource buck name = bucket name, for objectname = * (wildcard) because we have peform create , update and delete the object in this bucket. now ARN is generated like this 
+     arn:aws:s3:::kashcool/*
+     next name review and policyname and create policy.
+     Now we have create new user to represent WEBapp to access S3 Bucket. default setting with create policies, after creating user generate access key and secret key outside aws console access.
+    
+5. npm install @aws-sdk/client-s3
+6. s3 bucket config, multer storage is config, helper function to upload defined (multipart)
+7. Only express can access the image stored or in aws console open image can view rarther than that even webpage can view image eventhough it is processed by express and send .
+     npm i @aws-sdk/s3-request-presigner
+     url is signed so we can view through that url
+

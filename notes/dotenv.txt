@@ -1,0 +1,34 @@
+ENVIRONMENT VARIABLE DECLARATION
+
+The dotenv package is used to load environment variables from a .env file into process.env in Node.js applications. 
+
+npm install dotenv
+
+Usage Example:
+Install the Package:
+
+bash
+Copy code
+npm install dotenv
+Create a .env File: In your project directory, create a .env file with key-value pairs:
+
+bash
+Copy code
+MONGODB_URI=mongodb://localhost/kashcool
+SUPER_ADMIN_EMAIL=admin@example.com
+SUPER_ADMIN_PASSWORD=supersecurepassword
+Use dotenv in Your Application: In your Node.js application (for example, in the index.ts or setup.ts), import and configure dotenv like this:
+
+typescript
+Copy code
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Now you can access the variables via process.env
+const dbConnectionString = process.env.MONGODB_URI;
+const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+const adminPassword = process.env.SUPER_ADMIN_PASSWORD;
+
+console.log(dbConnectionString, adminEmail, adminPassword);

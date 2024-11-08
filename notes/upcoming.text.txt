@@ -1,0 +1,25 @@
+let store only objId in other model .// change of plan
+backend push. update/delete it should track back and front all change of field.
+
+req.user. check if it used productively in all case of grade.
+
+check delete region in each stage
+if region is deleted then set it to null (also in admin)
+admin profile changed need to logout in all token and make region to null
+in redis auto expires. admin token member stil present
+EDIT field is missing in all..
+
+while view. need signed URLimport { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+const client = new S3Client(clientParams);
+const command = new GetObjectCommand(getObjectParams);
+const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+
+-------------------
+bug:
+validation needed how input should be .
+
+----------------
+user - delete account
+subcription course
+now lets create child and add it in parent model. when create page is fetched we need to send available grade , semester in particular region. where in req.user.region have user region.

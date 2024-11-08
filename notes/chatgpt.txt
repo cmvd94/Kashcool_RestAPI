@@ -1,0 +1,490 @@
+region model:
+import mongoose, { Document } from "mongoose";
+
+// Define the interface for the grade in a region
+export interface RegionGrade {
+    gradeName: string;
+    gradeId: mongoose.Schema.Types.ObjectId;  // Reference to Grade model
+}
+
+// Define the interface for RegionDocument
+export interface RegionDocument extends Document {
+    _id: mongoose.Schema.Types.ObjectId;
+    regionName: string;
+    grades: RegionGrade[];
+    addAndSortGrades: (gradeName: string, gradeId: mongoose.Schema.Types.ObjectId) => Promise<void>;
+    sortGrades: () => void;
+}
+
+// Define the Region schema
+const regionSchema = new mongoose.Schema<RegionDocument>({
+    regionName: { type: String, required: true, unique: true },  // e.g., "Kuwait", "Saudi"
+    grades: [
+        {
+            gradeName: { type: String, required: true },  // e.g., "Grade 1", "Grade 2"
+            gradeId: { type: mongoose.Schema.Types.ObjectId, ref: "Grade", required: true }  // Reference to Grade model
+        }
+    ]
+});
+// Helper function to extract the numerical part and the alphabetical suffix from gradeName
+const parseGradeLevel = (gradeName: string) => {
+    const regex = /^Grade\s(\d+)([A-Z]*)$/;  // Matches "Grade 11A", "Grade 11B", etc.
+    const match = gradeName.match(regex);
+    if (match) {
+        const numericPart = parseInt(match[1], 10);  // Extract numeric part (e.g., 11)
+        const alphabeticalPart = match[2] || '';  // Extract alphabetical suffix (e.g., "A")
+        return { numericPart, alphabeticalPart };
+    }
+    return { numericPart: 0, alphabeticalPart: '' };  // Default fallback
+};
+
+// Helper method to add and sort grades in the region
+regionSchema.methods.addAndSortGrades = async function (gradeName: string, gradeId: mongoose.Schema.Types.ObjectId) {
+    // Add the new grade to the grades array
+    this.grades.push({ gradeName, gradeId });
+
+    // Trigger sorting after adding the grade
+    this.sortGrades();
+};
+
+// Sort grades function
+regionSchema.methods.sortGrades = function () {
+    this.grades.sort((a: RegionGrade, b: RegionGrade) => {
+        const gradeA = parseGradeLevel(a.gradeName);
+        const gradeB = parseGradeLevel(b.gradeName);
+
+        // Compare by numeric part first
+        if (gradeA.numericPart !== gradeB.numericPart) {
+            return gradeA.numericPart - gradeB.numericPart;
+        }
+
+        // If numeric parts are equal, compare by alphabetical part
+        return gradeA.alphabeticalPart.localeCompare(gradeB.alphabeticalPart);
+    });
+};
+
+// Pre-save hook to ensure sorting happens on every save
+regionSchema.pre('save', function (next) {
+    this.sortGrades();
+    next();
+});
+
+// Export the Region model
+export const Region = mongoose.model<RegionDocument>("Region", regionSchema);
+
+grade model:
+import mongoose, { Document } from "mongoose";
+
+// Define the interface for Subject within each semester
+interface Subject {
+    subjectId: mongoose.Schema.Types.ObjectId;
+    subjectName: string;
+    image: string;
+}
+
+// Define the interface for Semester
+interface Semester {
+    semesterName: string;  // e.g., 'Semester 1', 'Semester 2', etc.
+    subjects: Subject[];   // Array of subjects for each semester
+}
+
+// Define the interface for GradeDocument
+export interface GradeDocument extends Document {
+    _id: mongoose.Schema.Types.ObjectId;
+    grade: string;
+    region: mongoose.Schema.Types.ObjectId;        // Region identifier (e.g., 'kuwait', 'saudi')
+    semesters?: Semester[]; // Array of dynamic semesters
+}
+
+// Define the Grade schema
+const gradeSchema = new mongoose.Schema<GradeDocument>({
+    grade: { type: String, required: true },
+    region:  {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Region",
+        required : true
+      },  // Region-specific field
+    semesters: [
+        {
+            semesterName: { type: String, required: true }, // Dynamically added semester name
+            subjects: [
+                {
+                    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
+                    subjectName: { type: String, required: true },
+                    image: { type: String, required: true }
+                }
+            ]
+        }
+    ]
+});
+
+// Set a default empty array for semesters in the schema
+gradeSchema.path('semesters').default(() => []);
+
+// Helper function to extract the numeric part of the semester name
+function extractSemesterNumber(semesterName: string): number {
+    const match = semesterName.match(/\d+/);  // Extract the first number found in the string
+    return match ? parseInt(match[0], 10) : 0;  // Return the number or 0 if no number found
+}
+
+// Pre-save hook to sort the semesters by their numeric part
+gradeSchema.pre('save', function (next) {
+    if (this.semesters && this.semesters.length > 0) {
+        this.semesters.sort((a, b) => {
+            const numA = extractSemesterNumber(a.semesterName);
+            const numB = extractSemesterNumber(b.semesterName);
+            return numA - numB;  // Sort based on the extracted numbers
+        });
+    }
+    next();
+})
+
+// Define the Grade model
+export const Grade = mongoose.model<GradeDocument>("Grade", gradeSchema);
+
+subject model:
+import mongoose, { Document, Schema } from "mongoose";
+
+// Define the interface for a Unit object
+interface Unit {
+    unitNo: String;        // Unit number
+    unitName: string;      // Unit name
+    unitObjectId: mongoose.Schema.Types.ObjectId; // Reference to another Unit document
+}
+
+// Define the interface for SubjectDocument
+export interface SubjectDocument extends Document {
+    _id: mongoose.Schema.Types.ObjectId;
+    region: mongoose.Schema.Types.ObjectId;
+    gradeId: mongoose.Schema.Types.ObjectId;
+    semester: string;               // Semester (e.g., "Semester 1")
+    subjectName: string;            // Subject name
+    subjectImage: string;           // URL of the subject's image
+    subjectDescription: string;     // Description of the subject
+    subjectQuiz: mongoose.Schema.Types.ObjectId; // Reference to a Quiz model
+    lesson: number;                 // Number of lessons
+    unit: Unit[];                   // Array of units
+}
+
+// Define the Subject schema
+const subjectSchema = new Schema<SubjectDocument>({
+    region: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Region",
+        required : true
+      },
+      gradeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Grade",
+        required : true
+      },
+    semester: { type: String, required: true }, // Semester (e.g., "Semester 1")
+    subjectName: { type: String, required: true }, // Subject name
+    subjectImage: { type: String, required: true }, // Subject image URL
+    subjectDescription: { type: String, required: true }, // Subject description
+    //subjectQuiz: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz', required: true }, // Reference to a Quiz model
+    subjectQuiz: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz'}, // Reference to a Quiz model
+    lesson: { type: Number, required: true }, // Number of lessons
+    unit: [{                                   // Array of unit objects
+        unitNo: { type: String, required: true }, // Unit number
+        unitName: { type: String, required: true }, // Unit name
+        unitObjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit', required: true } // Reference to a Unit model
+    }]
+}, {
+    timestamps: true // Automatically manage createdAt and updatedAt fields
+});
+
+// Create the Subject model
+export const Subject = mongoose.model<SubjectDocument>("Subject", subjectSchema);
+
+unit model:
+import mongoose, { Document, Schema } from "mongoose";
+
+// Define the interface for a Lesson object
+interface Lesson {
+    lessonNo: string;                      // Lesson number (as a string)
+    lessonName: string;                    // Lesson name
+    lessonId: mongoose.Schema.Types.ObjectId; // Reference to a Lesson document
+}
+
+// Define the interface for UnitDocument
+export interface UnitDocument extends Document {
+    _id: mongoose.Schema.Types.ObjectId;
+    region: mongoose.Schema.Types.ObjectId;
+    subjectId: mongoose.Schema.Types.ObjectId;
+    unitName: string;                      // Unit name
+    totalLesson: number; 
+    lesson: Lesson[];                      // Array of lessons
+}
+
+// Define the Unit schema
+const unitSchema = new Schema<UnitDocument>({
+    region: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Region",
+        required : true
+      },
+      subjectId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Subject",
+        required : true
+      },
+    unitName: { type: String, required: true }, // Unit name
+    totalLesson: { type: Number, required: true }, // Total number of lessons
+    lesson: [{                                   // Array of lesson objects
+        lessonNo: { type: String, required: true }, // Lesson number as string
+        lessonName: { type: String, required: true }, // Lesson name
+        lessonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson', required: true } // Reference to a Lesson model
+    }]
+}, {
+    timestamps: true // Automatically manage createdAt and updatedAt fields
+});
+
+// Create the Unit model
+export const Unit = mongoose.model<UnitDocument>("Unit", unitSchema);
+
+lesson model:
+import mongoose, { Document, Schema } from "mongoose";
+
+// Define the interface for a Chapter object
+interface Chapter {
+  chapterNumber: string; // Chapter number as a string
+  chapterName: string; // Chapter name
+  chapterType: "webpage" | "image" | "video"; // Chapter type
+  chapterContent: string; // Chapter content (URL or text)
+}
+
+// Define the interface for LessonDocument
+export interface LessonDocument extends Document {
+  _id: mongoose.Schema.Types.ObjectId;
+  region: mongoose.Schema.Types.ObjectId;
+  unitId: mongoose.Schema.Types.ObjectId;
+  lessonNo: Number,
+  lessonName: String,
+  chapter: Chapter[]; // Array of chapters
+}
+
+// Define the Lesson schema
+const lessonSchema = new Schema<LessonDocument>(
+  {
+    region: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Region",
+      required: true,
+    },
+    unitId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Unit",
+      required: true,
+    },
+    lessonNo: { type: String, required: true }, // Lesson number
+    lessonName: { type: String, required: true }, // Lesson name
+    chapter: [
+      {
+        // Array of chapter objects
+        chapterNumber: { type: String, required: true }, // Chapter number as string
+        chapterName: { type: String, required: true }, // Chapter name
+        chapterType: {
+          type: String,
+          enum: ["webpage", "image", "video"],
+          required: true,
+        }, // Chapter type (e.g., video, text, etc.)
+        chapterContent: { type: String, required: true }, // Chapter content (could be text or URL to content)
+      },
+    ],
+  },
+  {
+    timestamps: true, // Automatically manage createdAt and updatedAt fields
+  }
+);
+
+// Create the Lesson model
+export const Lesson = mongoose.model<LessonDocument>("Lesson", lessonSchema);
+
+
+s3client:
+// src/config/s3Client.ts
+import { S3Client } from "@aws-sdk/client-s3";
+import dotenv from "dotenv";
+
+dotenv.config(); // Load .env file
+
+// Initialize S3 client
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
+  },
+});
+
+export default s3;
+
+multer config:
+// src/config/multerConfig.ts
+import multer from "multer";
+
+const storage = multer.memoryStorage(); // Store files in memory for uploading to S3
+
+const upload = multer({
+  storage: storage,
+ // limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+
+});
+
+export default upload;
+
+custom request:
+// src/types/CustomRequest.ts
+import { Request } from "express";
+import mongoose from "mongoose";
+
+export interface CustomRequest extends Request {
+  user?: {
+    id: mongoose.Schema.Types.ObjectId;
+    name: string;
+    role: string;
+    region: mongoose.Schema.Types.ObjectId | null | undefined;
+    grade: mongoose.Schema.Types.ObjectId | null | undefined;
+  };
+}
+
+multipart upload:
+// src/utils/multipartUpload.ts
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import s3 from "../config/s3Client";
+import { Readable } from "stream";
+
+export const multipartUpload = async (
+  buffer: Buffer,
+  fileName: string,
+  contentType: string
+) => {
+  try {
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME as string,
+      Key: fileName,
+      Body: buffer,
+      ContentType: contentType,
+    };
+
+    const command = new PutObjectCommand(uploadParams);
+    await s3.send(command);
+
+  } catch (error) {
+    console.error("S3 upload error: ", error);
+    throw new Error("Failed to upload file to S3");
+  }
+};
+
+delete s3 object:
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import s3 from "../config/s3Client";
+
+
+// Function to delete an object from S3 using AWS SDK v3
+export const deleteS3Object = async (key: string): Promise<void> => {
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME as string,  // Your S3 bucket name
+    Key: key,  // File path to delete
+  };
+
+  try {
+    const command = new DeleteObjectCommand(params);
+    const boolean = await s3.send(command);
+    console.log(process.env.AWS_BUCKET_NAME)
+    console.log(boolean);
+    console.log(`File deleted successfully from S3: ${key}`);
+  } catch (err) {
+    console.error(`Error deleting file from S3: ${key}`, err);
+    throw new Error("Failed to delete old image from S3");
+  }
+};
+
+how s3 object added. & how my controller action defined:
+
+export const editSubject = async (req: CustomRequest, res: Response) => {
+  const { subjectName, subjectDescription } = req.body;
+  
+  // Check if the region and grade are present in the authenticated user data
+  if (!req.user?.region || !req.user?.grade) {
+    return res.status(400).json({ message: "Region and Grade must be selected before accessing grades" });
+  }
+
+  const { region, grade } = req.user;  // Extract region and grade from user
+  const semesterName = req.params.semesterName;  // Semester name from params
+  const subjectId = req.params.subjectId;        // Subject ID from params
+
+  // Ensure required fields are present
+  if (!subjectName || !subjectDescription) {
+    return res.status(400).json({ message: "Subject name and description are required" });
+  }
+
+  try {
+    // Step 1: Find the grade by ID and region
+    const gradeDoc = await Grade.findById(grade);
+    if (!gradeDoc) {
+      return res.status(404).json({ message: "Grade not found" });
+    }
+
+    // Step 2: Find the subject by ID
+    const subject = await Subject.findById(subjectId);
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    // Step 3: Handle image upload if new image is provided
+    let fileName = subject.subjectImage; // Default to the existing image URL
+    if (req.file) {
+      const gradeName = gradeDoc.grade;
+      const fileExtension = req.file.mimetype.split("/")[1];
+      fileName = `${region}/${gradeName}/${semesterName}/${subjectName}/${req.file.originalname.split('.')[0]}${uuidv4()}.${fileExtension}`
+
+      // Upload new image to S3
+      await multipartUpload(req.file.buffer, fileName, req.file.mimetype);
+
+      // Delete old image from S3
+      if (subject.subjectImage) {
+        await deleteS3Object(subject.subjectImage); // Assuming this deletes based on the S3 path/key
+      }
+    }
+
+    // Step 4: Update the subject fields
+    subject.subjectName = subjectName;
+    subject.subjectDescription = subjectDescription;
+    subject.subjectImage = fileName;  // Use the new image URL or the old one
+
+    await subject.save();
+
+    // Step 5: Update the grade document for the corresponding semester and subject
+    const semester = gradeDoc.semesters?.find(s => s.semesterName === semesterName);
+
+    if (semester) {
+      const subjectIndex = semester.subjects.findIndex(s => s.subjectId.toString() === subjectId);
+
+      if (subjectIndex !== -1) {
+        // Update subject details in the semester's subjects array
+        semester.subjects[subjectIndex] = {
+          subjectId: subject._id,
+          subjectName: subjectName,
+          image: fileName
+        };
+      }
+    }
+
+    await gradeDoc.save();
+
+    // Log the admin action
+    await logAdminAction(req, "Edit Subject", true, "Subject", subject._id.toString(), `Edited subject: ${subjectName}`);
+
+    // Return success response
+    res.status(200).json({ message: "Subject updated successfully", subject });
+  } catch (err: unknown) {
+    // Enhanced error handling
+    if (err instanceof Error) {
+      await logAdminAction(req, "Edit Subject", false, "Subject", "", err.message);
+      return res.status(500).json({ message: "Error editing subject", error: err.message });
+    }
+    return res.status(500).json({ message: "Unknown error occurred" });
+  }
+};

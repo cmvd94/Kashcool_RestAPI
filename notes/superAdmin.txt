@@ -1,0 +1,13 @@
+Assigning Roles Manually (via Database)
+If needed, you can also manually assign roles directly in the database. This method can be used for initial setup or emergency cases where the Super Admin needs to be updated directly.
+
+Here’s an example MongoDB query to manually create an admin or assign a role:
+# To create a new admin with role 'contentmanager'
+db.admins.insert({
+    email: "contentmanager@example.com",
+    password: "hashedpassword",
+    role: "contentmanager"
+});
+
+# To update an existing admin's role to 'superadmin'
+db.admins.update({ email: "existingadmin@example.com" }, { $set: { role: "superadmin" } });

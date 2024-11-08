@@ -1,0 +1,36 @@
+AutoCompiling .ts file with nodemon.
+npm i nodemon typescript ts-node 
+Why .js Files Aren't Being Generated
+ts-node Execution: When you run your application with ts-node, it compiles TypeScript files on the fly and directly executes the compiled code in memory. This means that no .js files are written to the dist directory or any other location on disk.
+No Explicit Compilation Step: Since you're not explicitly running tsc (the TypeScript compiler) with a command like tsc or tsc --project tsconfig.json, no .js files are being generated in your output directory.
+
+package.json
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+nodemon.json
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": ["src/**/*.test.ts"],
+  "exec": "ts-node ./src/app.ts"
+}
+in package.json
+{
+  "scripts": {
+    "dev": "nodemon"
+  }
+}
+
+npm run dev
+
